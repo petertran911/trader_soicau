@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bảng soi cầu nhảy Binance</title>
+    <style>
+      html {
+        box-sizing: border-box;
+      }
+      *,
+      *:before,
+      *:after {
+        box-sizing: inherit;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        background: #181c24;
+        color: #eee;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 100vw;
+        margin: 0 auto;
+        background: #23272f;
+        padding: 12px 4vw 18px 4vw;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px #0008;
+      }
+      h2 {
+        text-align: center;
+        font-size: 1.2rem;
+        margin: 10px 0 12px 0;
+      }
+      select,
+      button {
+        font-size: 1rem;
+        padding: 4px 8px;
+        margin: 0 4px 6px 0;
+        border-radius: 6px;
+        border: none;
+      }
+      .matrix {
+        font-size: 1.25rem;
+        line-height: 1.5rem;
+        letter-spacing: 0.1rem;
+        text-align: left;
+        margin: 12px auto 6px auto;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 2px;
+        display: block;
+        max-width: 100vw;
+      }
+      .matrix .cell {
+        display: inline-block;
+        width: 1.7em;
+        text-align: center;
+      }
+      .matrix::-webkit-scrollbar {
+        height: 6px;
+        background: #23272f;
+      }
+      .matrix::-webkit-scrollbar-thumb {
+        background: #333;
+        border-radius: 3px;
+      }
+      #candle-row {
+        margin-top: 10px;
+        text-align: center;
+        font-size: 1.1rem;
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+      }
+      #candle-row span,
+      #candle-row div {
+        margin: 0 1px;
+        display: inline-block;
+      }
+      .time-row {
+        font-size: 0.8rem;
+        color: #aaa;
+      }
+      .info {
+        margin: 8px 0;
+        font-size: 0.9rem;
+      }
+      @keyframes ping-pong-scale {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.2);
+        }
+        100% {
+          transform: scale(1);
+        }
+      }
+      .ping-pong {
+        animation-name: ping-pong-scale;
+        animation-duration: 0.5s;
+        animation-iteration-count: infinite;
+        animation-direction: alternate;
+        display: inline-block;
+      }
+      @media (max-width: 600px) {
+        .container {
+          padding: 4px 1vw 10px 1vw;
+          border-radius: 0;
+          box-shadow: none;
+        }
+        h2 {
+          font-size: 1rem;
+        }
+        .matrix {
+          font-size: 0.75rem;
+          line-height: 0.95rem;
+          letter-spacing: 0.03rem;
+          margin: 10px auto 4px auto;
+          text-align: center;
+          display: block;
+          max-width: 98vw;
+        }
+        .matrix .cell {
+          width: 1.2em;
+        }
+        #candle-row {
+          font-size: 0.9rem;
+        }
+        .info {
+          font-size: 0.8rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Bảng soi cầu kiểu cầu nhảy (Binance)</h2>
+      <div class="info">
+        Symbol:
+        <select id="symbol" onchange="loadMatrix()">
+          <option value="ETHUSDT">ETHUSDT</option>
+          <option value="ESPORTSUSDT">ESPORTSUSDT</option>
+          <option value="XRPUSDT">XRPUSDT</option>
+          <option value="BNBUSDT">BNBUSDT</option>
+          <option value="IDOLUSDT">IDOLUSDT</option>
+          <option value="API3USDT">API3USDT</option>
+          <option value="BTCUSDT">BTCUSDT</option>
+          <option value="YALAUSDT">YALAUSDT</option>
+          <option value="PROMUSDT">PROMUSDT</option>
+          <option value="MYXUSDT" selected>MYXUSDT</option>
+        </select>
+        Timeframe:
+        <select id="timeframe" onchange="loadMatrix()">
+          <option value="1m" selected>1m</option>
+          <option value="3m">3m</option>
+          <option value="5m">5m</option>
+          <option value="15m">15m</option>
+          <option value="30m">30m</option>
+          <option value="1h">1h</option>
+        </select>
+        <button onclick="loadMatrix()">Tải dữ liệu</button>
+      </div>
+      <div
+        id="binance-time"
+        style="margin-bottom: 8px; color: #8cf; font-size: 1.05rem"
+      ></div>
+      <div id="matrix"></div>
+      <div id="candle-row"></div>
+      <div id="error" style="color: #f66"></div>
+    </div>
+    <script>
+      async function fetchBinanceTime() {
+        try {
+          const timeRes = await fetch("https://fapi.binance.com/fapi/v1/time");
+          if (timeRes.ok) {
+            const t = await timeRes.json();
+            const d = new Date(t.serverTime);
+            document.getElementById("binance-time").textContent =
+              "Binance time: " + d.toLocaleString("en-GB", { hour12: false });
+          } else {
+            document.getElementById("binance-time").textContent =
+              "Binance time: --";
+          }
+        } catch {
+          document.getElementById("binance-time").textContent =
+            "Binance time: --";
+        }
+      }
+
+      // Gọi cập nhật thời gian Binance mỗi giây
+      setInterval(fetchBinanceTime, 1000);
+      // Gọi ngay khi load trang
+      fetchBinanceTime();
+
+      async function loadMatrix() {
+        const symbol = document
+          .getElementById("symbol")
+          .value.trim()
+          .toUpperCase();
+        const tf = document.getElementById("timeframe").value;
+        const matrixDiv = document.getElementById("matrix");
+        const errorDiv = document.getElementById("error");
+
+        matrixDiv.innerHTML = "";
+        errorDiv.textContent = "";
+
+        try {
+          const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=50`;
+          const res = await fetch(url);
+
+          if (!res.ok) {
+            throw new Error("Không lấy được dữ liệu từ Binance Futures!");
+          }
+
+          const data = await res.json();
+          const DOJI_THRESHOLD = 0.001;
+          const MAX_CANDLES = 30;
+
+          const candles = data
+            .map((c) => {
+              const open = parseFloat(c[1]);
+              const close = parseFloat(c[4]);
+              const diff = Math.abs(close - open);
+              let color = null; // null cho doji, 1 cho xanh, 0 cho đỏ
+
+              color = close > open ? 1 : 0;
+
+              const d = new Date(c[0]);
+              return {
+                color,
+                time: d.toLocaleTimeString("en-GB", { hour12: false }),
+              };
+            })
+            .slice(-MAX_CANDLES);
+
+          // Xây dựng ma trận "cầu nhảy"
+          let matrix = [];
+          let currentCol = [];
+          let prevColor = null;
+          //dao nguoc  candles
+          candles.reverse();
+
+          //tao string chua mau cua cac nen
+          let colorString = "";
+          candles.forEach((c) => {
+            if (c.color === 1) colorString += " G"; // Green
+            else if (c.color === 0) colorString += " R"; // Red
+          });
+          console.log("Color String:", colorString);
+
+          for (const candle of candles) {
+            // Trường hợp 1: Bắt đầu cột mới
+            // - Nếu currentCol đang rỗng (cột đầu tiên)
+            // - HOẶC nến hiện tại khác màu với nến trước đó (không tính doji)
+            // - HOẶC cột hiện tại đã đầy 6 nến
+            if (
+              currentCol.length === 0 ||
+              candle.color !== prevColor ||
+              currentCol.length >= 6
+            ) {
+              currentCol = [candle];
+              matrix.push(currentCol);
+            } else {
+              // Trường hợp 2: Tiếp tục cột hiện tại
+              // - Nến hiện tại cùng màu với nến trước đó
+              currentCol.push(candle);
+            }
+
+            // Cập nhật màu nến trước đó.
+            if (candle.color !== null) {
+              prevColor = candle.color;
+            }
+          }
+
+          // Giới hạn số cột hiển thị để tránh layout bị lệch (ví dụ 10 cột mới nhất)
+          const MAX_COLS = 19;
+          let renderMatrix = matrix;
+          if (matrix.length > MAX_COLS) {
+            renderMatrix = matrix.slice(-MAX_COLS);
+          }
+          // Đảo chiều: cột mới nhất sang phải
+          renderMatrix = renderMatrix.slice().reverse();
+          let html = '<div class="matrix">';
+          for (let rowIdx = 0; rowIdx < 6; rowIdx++) {
+            for (let colIdx = 0; colIdx < renderMatrix.length; colIdx++) {
+              const candle = renderMatrix[colIdx][rowIdx];
+              // Check if this is the newest candle (bên phải, hàng đầu)
+              const isFirstCandle =
+                rowIdx === 0 && colIdx === renderMatrix.length - 1;
+              const animationClass = isFirstCandle ? "ping-pong" : "";
+              if (!candle) {
+                html += `<span class="cell ${animationClass}" style="color: grey;">◯</span>`;
+              } else if (candle.color === 1) {
+                html += `<span class="cell ${animationClass}">🟢</span>`;
+              } else if (candle.color === 0) {
+                html += `<span class="cell ${animationClass}">🔴</span>`;
+              }
+            }
+            html += "<br/>";
+          }
+          html += "</div>";
+
+          if (candles.length > 0) {
+            html += `<div class="info">Nến cuối cùng: ${candles[0].time}</div>`;
+          }
+
+          matrixDiv.innerHTML = html;
+          // Vẽ biểu đồ cột mini cho 19 nến cuối cùng, mới nhất sang phải
+          const lastCandles = data.slice(-19); // không reverse
+          // Tìm biên độ lớn nhất để scale chiều cao
+          let maxRange = 0;
+          lastCandles.forEach((c) => {
+            const open = parseFloat(c[1]);
+            const close = parseFloat(c[4]);
+            const range = Math.abs(close - open);
+            if (range > maxRange) maxRange = range;
+          });
+          // Đo chiều rộng emoji 🔴
+          const emojiSpan = document.createElement("span");
+          emojiSpan.textContent = "🔴";
+          emojiSpan.style.visibility = "hidden";
+          document.body.appendChild(emojiSpan);
+          const emojiWidth = 22; // fallback nếu không đo được
+          document.body.removeChild(emojiSpan);
+          let candleBarHtml = `<div style="display:flex;align-items:end;justify-content:center;height:60px;gap:2px;">`;
+          lastCandles.forEach((c) => {
+            const open = parseFloat(c[1]);
+            const close = parseFloat(c[4]);
+            const range = Math.abs(close - open);
+            let color = close > open ? "#0f0" : "#f44";
+            let height =
+              maxRange > 0 ? Math.max(8, (range / maxRange) * 50) : 8;
+            candleBarHtml += `<div style="width:${emojiWidth}px;height:${height}px;background:${color};border-radius:2px;"></div>`;
+          });
+          candleBarHtml += "</div>";
+          document.getElementById("candle-row").innerHTML = candleBarHtml;
+
+          // Hàm cập nhật riêng chiều cao cột bar của nến cuối cùng mỗi giây
+          let lastBarInterval;
+          function updateLastBar() {
+            if (!lastCandles.length) return;
+            const lastCandle = lastCandles[lastCandles.length - 1];
+            fetch(
+              `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=1`
+            )
+              .then((res) => res.json())
+              .then((latest) => {
+                if (!Array.isArray(latest) || !latest[0]) return;
+                const open = parseFloat(latest[0][1]);
+                const close = parseFloat(latest[0][4]);
+                const range = Math.abs(close - open);
+                let color = close > open ? "#0f0" : "#f44";
+                let height =
+                  maxRange > 0 ? Math.max(8, (range / maxRange) * 50) : 8;
+                // Cập nhật chiều cao và màu cột cuối cùng
+                const bars = document.querySelectorAll("#candle-row div");
+                if (bars.length) {
+                  const lastBar = bars[bars.length - 1];
+                  lastBar.style.height = height + "px";
+                  lastBar.style.background = color;
+                }
+              });
+          }
+          // Xóa interval cũ nếu có
+          if (window._lastBarInterval) clearInterval(window._lastBarInterval);
+          window._lastBarInterval = setInterval(updateLastBar, 1000);
+          updateLastBar();
+        } catch (e) {
+          errorDiv.textContent = e.message;
+        }
+      }
+    </script>
+    <script>
+      loadMatrix();
+    </script>
+  </body>
+</html>
