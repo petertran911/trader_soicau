@@ -209,32 +209,47 @@
         errorDiv.textContent = "";
 
         try {
-          const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=50`;
+          var DOJI_THRESHOLD = 0.01;
+          const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=1000`;
           const res = await fetch(url);
+          const exchangeInfo = await fetch(
+            "https://fapi.binance.com/fapi/v1/exchangeInfo"
+          )
+            .then((res) => res.json())
+            .then((info) => {
+              const s = info.symbols.find((x) => x.symbol === symbol);
+
+              const tickSize = s.filters.find(
+                (f) => f.filterType === "PRICE_FILTER"
+              ).tickSize;
+              console.log("tickSize:", tickSize);
+              DOJI_THRESHOLD = tickSize * 100;
+            });
 
           if (!res.ok) {
             throw new Error("Không lấy được dữ liệu từ Binance Futures!");
           }
 
           const data = await res.json();
-          const DOJI_THRESHOLD = 0.001;
-          const MAX_CANDLES = 30;
 
+          const MAX_CANDLES = 30;
+          // Chỉ lấy nến có thân >= DOJI_THRESHOLD
           const candles = data
             .map((c) => {
               const open = parseFloat(c[1]);
               const close = parseFloat(c[4]);
               const diff = Math.abs(close - open);
-              let color = null; // null cho doji, 1 cho xanh, 0 cho đỏ
-
-              color = close > open ? 1 : 0;
-
-              const d = new Date(c[0]);
               return {
-                color,
-                time: d.toLocaleTimeString("en-GB", { hour12: false }),
+                open,
+                close,
+                diff,
+                color: close > open ? 1 : 0,
+                time: new Date(c[0]).toLocaleTimeString("en-GB", {
+                  hour12: false,
+                }),
               };
             })
+            .filter((c) => c.diff >= DOJI_THRESHOLD)
             .slice(-MAX_CANDLES);
 
           // Xây dựng ma trận "cầu nhảy"
