@@ -142,6 +142,7 @@
       <div class="info">
         Symbol:
         <select id="symbol" onchange="loadMatrix()">
+          <option value="BIOUSDT">BIOUSDT</option>
           <option value="ETHUSDT">ETHUSDT</option>
           <option value="ESPORTSUSDT">ESPORTSUSDT</option>
           <option value="XRPUSDT">XRPUSDT</option>
@@ -210,21 +211,8 @@
 
         try {
           var DOJI_THRESHOLD = 0.01;
-          const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=1000`;
+          const url = `https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=${tf}&limit=50`;
           const res = await fetch(url);
-          const exchangeInfo = await fetch(
-            "https://fapi.binance.com/fapi/v1/exchangeInfo"
-          )
-            .then((res) => res.json())
-            .then((info) => {
-              const s = info.symbols.find((x) => x.symbol === symbol);
-
-              const tickSize = s.filters.find(
-                (f) => f.filterType === "PRICE_FILTER"
-              ).tickSize;
-              console.log("tickSize:", tickSize);
-              DOJI_THRESHOLD = tickSize * 100;
-            });
 
           if (!res.ok) {
             throw new Error("Không lấy được dữ liệu từ Binance Futures!");
@@ -249,7 +237,7 @@
                 }),
               };
             })
-            .filter((c) => c.diff >= DOJI_THRESHOLD)
+
             .slice(-MAX_CANDLES);
 
           // Xây dựng ma trận "cầu nhảy"
